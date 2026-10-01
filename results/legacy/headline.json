@@ -1,0 +1,20 @@
+{
+  "autocorr_lag1": 0.9943770396438391,
+  "rows_dropped_pct": 40.710565476190474,
+  "resample_ahead_pct": 71.25,
+  "resample_tied_pct": 28.75,
+  "resample_behind_pct": 0.0,
+  "mcnemar_p": 3.0517578125e-05,
+  "g1_mae": 0.2303663465956272,
+  "g1_floor": 0.1844201022125928,
+  "g2_model": 0.9666666666666667,
+  "g2_rule": 0.9666666666666667,
+  "g2_model_large": 0.995,
+  "g2_rule_large": 0.955,
+  "g3_pct": 22.92761462857662,
+  "g3_ceiling": 26.322241846965046,
+  "g4_pct": 48.83612662942273,
+  "g4_wh_pct": 48.83612662942397,
+  "model": "blend",
+  "n_goals_met": 3
+}

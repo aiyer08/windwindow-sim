@@ -1,0 +1,6 @@
+location,label,note,hours,t_min,t_max,t_mean
+palo_alto,"Palo Alto, CA",Mediterranean; large diurnal swing,72,14.8,34.6,22.59
+phoenix,"Phoenix, AZ",Desert heat wave; hot nights,72,29.8,45.5,38.51
+austin,"Austin, TX",Hot and humid; warm nights,72,24.4,36.0,30.15
+chicago,"Chicago, IL",Continental summer heat spike,72,24.3,34.3,28.84
+seattle,"Seattle, WA",Cool maritime; ventilation almost always helps,72,13.4,30.9,21.82

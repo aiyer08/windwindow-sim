@@ -1,0 +1,189 @@
+<title>WindWindow Sim</title>
+<style>
+  /* Deliberately plain. Left column, default fonts, hairline tables, images
+     that fit. No cards, no shadows, no theme switching. */
+  body {
+    max-width: 52em;
+    margin: 2em auto;
+    padding: 0 1em;
+    background: #fff;
+    color: #000;
+    line-height: 1.5;
+  }
+  h1 { font-size: 1.8em; margin: 0 0 0.3em; }
+  h2 { font-size: 1.3em; margin: 2em 0 0.4em; }
+  h3 { font-size: 1.05em; margin: 1.4em 0 0.3em; }
+  p { margin: 0 0 0.9em; }
+  ul { margin: 0 0 0.9em; padding-left: 1.4em; }
+  li { margin-bottom: 0.4em; }
+  a { color: #00c; }
+  img { max-width: 100%; height: auto; border: 1px solid #ccc; }
+  figure { margin: 1.2em 0; }
+  figcaption { font-size: 0.85em; color: #444; margin-top: 0.4em; }
+  table { border-collapse: collapse; margin: 0.8em 0; font-size: 0.9em; }
+  th, td { border: 1px solid #999; padding: 0.25em 0.6em; text-align: left; }
+  th { background: #eee; }
+  td.n, th.n { text-align: right; }
+  caption { caption-side: bottom; text-align: left; font-size: 0.85em;
+            color: #444; padding-top: 0.4em; }
+  pre { background: #f4f4f4; border: 1px solid #ccc; padding: 0.6em;
+        overflow-x: auto; font-size: 0.85em; }
+  code { background: #f4f4f4; padding: 0 0.2em; }
+  blockquote { margin: 0.9em 0; padding: 0 0 0 0.9em; border-left: 3px solid #999; }
+  .tw { overflow-x: auto; }
+  .toc { font-size: 0.9em; }
+  .sub { color: #444; }
+  hr { border: 0; border-top: 1px solid #ccc; margin: 2em 0; }
+</style>
+<h1>WindWindow Sim</h1>
+
+<p>This simulates a bedroom in five real climates and asks whether opening and shutting the window at the right times can keep it cool through a heat wave with no air conditioning.</p>
+
+<p>In the two climates with cool nights it cuts overheating by 81% and 77%. That number counts both how far above 26 °C the room goes and how long it stays there. The time spent above 26 °C falls from 22 hours to 12 out of 48. It comes within 0.7% of a controller that is given the exact weather in advance and the true room parameters.</p>
+
+<p>I did not give the controller this strategy. It gets a comfort target and a 23-hour planning horizon, and it works the rest out on its own: open the window overnight to cool the walls and floor, keep it shut through the heat of the day, and open it again in the evening.</p>
+
+<p class="toc"><a href="#summary">Results</a> &middot; <a href="#controller">What it does</a> &middot; <a href="#comparison">Comparison</a> &middot; <a href="#identification">Fitting the model</a> &middot; <a href="#ablation">Ablations</a> &middot; <a href="#room">The room</a> &middot; <a href="#weather">Weather data</a> &middot; <a href="#using">Usage</a> &middot; <a href="#limits">Limitations</a> &middot; <a href="#repro">Running it</a> &middot; <a href="#layout">Files</a></p>
+
+<div class="tw"><table><tbody><tr><td><strong>Overheating cut</strong></td><td>81%</td><td>Seattle, WA. 5.2 times less than leaving the window shut</td></tr><tr><td><strong>Within</strong></td><td>0.7% of optimal</td><td>measured against perfect forecast and exact room parameters, worst of five climates</td></tr><tr><td><strong>Fan electricity</strong></td><td>42% less</td><td>than the best heuristic, at identical comfort (-0.5%)</td></tr><tr><td><strong>Screening rule</strong></td><td>r = -0.98</td><td>one free measurement predicts whether it will work in a given climate</td></tr></tbody></table></div>
+
+<h2 id="summary">Results</h2>
+
+<figure><img src="results/figures/rep_by_climate.png" alt="Grouped bars of overheating by climate and policy, and a bar chart of the reduction the controller achieves in each climate."><figcaption>Five climates, two weather seeds each, 48 hours per run. Neither seed was used for tuning.</figcaption></figure>
+
+<div class="tw"><table><thead><tr><th class="">Climate</th><th class="n">Night mean</th><th class="n">Peak outdoor</th><th class="n">Overheating cut</th><th class="n">vs shut</th><th class="n">Hours over 26, shut</th><th class="n">Hours over 26, controller</th><th class="n">Fan kWh</th></tr></thead><tbody><tr><td class="">Palo Alto, CA</td><td class="n">16.4</td><td class="n">31.6</td><td class="n">77%</td><td class="n">4.3x</td><td class="n">25.8</td><td class="n">11.5</td><td class="n">0.19</td></tr><tr><td class="">Phoenix, AZ</td><td class="n">34.5</td><td class="n">45.8</td><td class="n">29%</td><td class="n">1.4x</td><td class="n">48.0</td><td class="n">48.0</td><td class="n">0.87</td></tr><tr><td class="">Austin, TX</td><td class="n">27.0</td><td class="n">36.0</td><td class="n">54%</td><td class="n">2.2x</td><td class="n">48.0</td><td class="n">43.2</td><td class="n">0.80</td></tr><tr><td class="">Chicago, IL</td><td class="n">25.6</td><td class="n">34.8</td><td class="n">61%</td><td class="n">2.6x</td><td class="n">48.0</td><td class="n">35.8</td><td class="n">0.65</td></tr><tr><td class="">Seattle, WA</td><td class="n">15.9</td><td class="n">29.1</td><td class="n">81%</td><td class="n">5.2x</td><td class="n">22.2</td><td class="n">12.1</td><td class="n">0.31</td></tr></tbody><caption>48-hour runs. The last two columns are the same room left shut, then run by the controller.</caption></table></div>
+
+<h3>One measurement predicts whether this will work</h3>
+
+<p>Across the five climates, how much the controller helps tracks the average overnight temperature at r = -0.98. So you can work out whether it is worth installing by leaving a thermometer outside for a week. This works because the controller cools the walls and floor at night and then lives off that stored cold during the day. If the nights are not cold, there is nothing to store and nothing to live off.</p>
+
+<p>Phoenix, AZ is the climate where this does not work. Nights there average 35 °C, and the room stays above 26 °C for all 48 hours even when the controller is given perfect information. The 29% reduction it manages is real, but the room is still too warm to sleep in. If your nights are that warm, the money is better spent on insulation, shading or a heat pump, and a week with a thermometer will tell you which case you are in.</p>
+
+<h2 id="controller">What the controller does</h2>
+
+<figure><img src="results/figures/rep_strategy.png" alt="Indoor temperature under the controller, a sealed room and a permanently open room over two days, with window and fan settings below and the daily phases marked."><figcaption>The controller opens up overnight to cool the structure, keeps the room shut through the morning and midday, then opens again once the outside air drops back below the indoor temperature.</figcaption></figure>
+
+<p>The controller is told to do three things: stay below 26 °C, stay above 17 °C, and keep down what it spends on fan electricity and on moving the window. None of that mentions night, day, or the walls. The controller plans the whole of the next day at once, and once it can see the coming afternoon, cooling the walls at 4 am turns out to be the cheapest way to get through it. That is where the daily rhythm in the figure comes from.</p>
+
+<p>How far ahead the controller plans matters more than anything else I tuned. With a 7.5-hour horizon, a decision made at 2 am cannot see the following afternoon, so cooling the walls looks like a waste of fan power and the controller refuses to do it. At that horizon it loses to the simple rule of opening the window whenever it is cooler outside. Stretching the horizon to 23.5 hours is the one change that makes the night-cooling behaviour show up.</p>
+
+<pre>horizon 23.5 h in 12 blocks: 15, 15, 30, 30, 60, 60, 120, 120, 180, 240, 240, 300 min
+minimise  degree-minutes over 26 degC
+        + degree-minutes under 17 degC
+        + 0.7 per watt-hour of fan
+        + a small charge for moving the window
+re-plan every 15 min, execute the first block only</pre>
+
+<h2 id="comparison">Comparison</h2>
+
+<div class="tw"><table><thead><tr><th class="">Policy</th><th class="n">Degree-minutes over 26 °C</th><th class="n">Hours over 26 °C</th><th class="n">Worst peak</th><th class="n">Fan kWh</th></tr></thead><tbody><tr><td class="">Shut</td><td class="n">24242</td><td class="n">38.4</td><td class="n">53.0</td><td class="n">0.00</td></tr><tr><td class="">Open</td><td class="n">13704</td><td class="n">32.1</td><td class="n">46.5</td><td class="n">0.00</td></tr><tr><td class="">Timer, half the time</td><td class="n">13876</td><td class="n">32.4</td><td class="n">47.1</td><td class="n">0.60</td></tr><tr><td class="">Open when cooler outside</td><td class="n">12735</td><td class="n">30.0</td><td class="n">46.0</td><td class="n">0.97</td></tr><tr class="hi"><td class=""><strong>This controller</strong></td><td class="n">12669</td><td class="n">30.1</td><td class="n">46.1</td><td class="n">0.56</td></tr><tr><td class="">Perfect information</td><td class="n">12663</td><td class="n">30.0</td><td class="n">46.1</td><td class="n">0.55</td></tr></tbody><caption>Averaged over five climates and two seeds. The peak column is the worst single moment anywhere, so Phoenix dominates it.</caption></table></div>
+
+<p>The rule to beat is simply opening the window whenever it is cooler outside than in. That rule gets some night cooling for free without anyone planning it, which makes it a hard baseline to improve on. On temperature the two finish level, within 0.5% of each other.</p>
+
+<p>They differ in how much electricity they use. The simple rule turns the fan on whenever the window is open, because it has no way of weighing what the fan costs against what it achieves. The controller has the price of fan electricity written into its objective, so it only runs the fan when the extra cooling is worth the watt-hours. That works out to 42% less fan energy for the same indoor temperature.</p>
+
+<div class="tw"><table><thead><tr><th class="">Climate</th><th class="n">Heuristic, fan kWh</th><th class="n">Controller, fan kWh</th><th class="n">Saved</th><th class="n">Comfort difference</th></tr></thead><tbody><tr><td class="">Palo Alto, CA</td><td class="n">0.79</td><td class="n">0.19</td><td class="n">76%</td><td class="n">+0.5%</td></tr><tr><td class="">Phoenix, AZ</td><td class="n">1.06</td><td class="n">0.87</td><td class="n">18%</td><td class="n">-0.4%</td></tr><tr><td class="">Austin, TX</td><td class="n">1.16</td><td class="n">0.80</td><td class="n">31%</td><td class="n">-0.2%</td></tr><tr><td class="">Chicago, IL</td><td class="n">1.08</td><td class="n">0.65</td><td class="n">40%</td><td class="n">-1.5%</td></tr><tr><td class="">Seattle, WA</td><td class="n">0.75</td><td class="n">0.31</td><td class="n">59%</td><td class="n">-0.2%</td></tr></tbody><caption>Negative comfort difference means the controller ran cooler. The saving is largest where the nights are coldest, because there the open window does the cooling on its own and the fan is barely needed.</caption></table></div>
+
+<h2 id="identification">Fitting the model</h2>
+
+<p>To plan ahead, the controller needs to know how the room behaves over the next several hours, not just what the temperature will be in ten minutes. So I fit ten numbers to the logged data: the heat capacities of the air and of the structure, and the conductances between them and the outside. The fit uses 20 logged 48-hour sessions across the five climates, and it minimises the error over multi-hour stretches rather than over single steps.</p>
+
+<div class="tw"><table><thead><tr><th class=""></th><th class="n">Fitted</th><th class="n">Actual</th><th class="n">Off by</th></tr></thead><tbody><tr><td class="">Air and furniture</td><td class="n">132 kJ/K</td><td class="n">146 kJ/K</td><td class="n">-10%</td></tr><tr><td class="">Structure</td><td class="n">1.54 MJ/K</td><td class="n">1.50 MJ/K</td><td class="n">+3%</td></tr><tr><td class="">Heat loss, window shut</td><td class="n">23.2 W/K</td><td class="n">21.9 W/K</td><td class="n">+6%</td></tr><tr class="hi"><td class="">Structural time constant</td><td class="n">7.5 h</td><td class="n">7.4 h</td><td class="n">+0.5%</td></tr></tbody><caption>Median error across all ten parameters is 8%. The actual values are shown for comparison and took no part in the fit.</caption></table></div>
+
+<p>The structural time constant comes back within 0.5% of its true value and the heat-loss coefficient within 6%, even though the sensors feeding the fit carry a 0.3 °C calibration offset and 0.1 °C of noise. All ten parameters come out inside their physically plausible ranges.</p>
+
+<p>Forcing the fit to stay in physical units is what makes this work, and it is worth saying what happens when you do not. The two wall conductances cannot be told apart from the data, because the physics fixes their ratio to the ratio of the two heat capacities. When I left them free, the fit came back with a negative infiltration conductance and a structure 99% too light, and it still predicted the held-out sessions reasonably well. The trouble is that a model like that falls apart as soon as you ask it about an action the data never contained, and those are exactly the actions a planner wants to try out.</p>
+
+<div class="tw"><table><thead><tr><th class="">Horizon</th><th class="n">Mean error</th></tr></thead><tbody><tr><td class="">10 min</td><td class="n">0.35 °C</td></tr><tr><td class="">30 min</td><td class="n">0.61 °C</td></tr><tr><td class="">1 h</td><td class="n">0.72 °C</td></tr><tr><td class="">3 h</td><td class="n">0.79 °C</td></tr><tr><td class="">6 h</td><td class="n">0.78 °C</td></tr></tbody><caption>Ten held-out sessions. The room swings about 14 °C over a day, so the six-hour error is around 6% of that.</caption></table></div>
+
+<figure><img src="results/figures/step16_identification.png" alt="A held-out 48-hour session with the model prediction restarted every six hours, and a plot of error against prediction horizon."><figcaption>Prediction restarts every six hours from the measured state, so each segment is a genuine six-hour forecast.</figcaption></figure>
+
+<h2 id="ablation">Ablations</h2>
+
+<figure><img src="results/figures/rep_ablation.png" alt="Horizontal bars showing how much worse the controller performs when each capability is changed, and a scatter of comfort against fan electricity."><figcaption>Each row changes one thing and re-runs the whole evaluation. A positive cost means the room ran warmer than it did with the full controller.</figcaption></figure>
+
+<div class="tw"><table><thead><tr><th class="">Change</th><th class="n">Degree-minutes</th><th class="n">Cost</th></tr></thead><tbody><tr><td class="">no forecast (persistence)</td><td class="n">2306</td><td class="n">+9.0%</td></tr><tr><td class="">perfect forecast</td><td class="n">2120</td><td class="n">+0.2%</td></tr><tr><td class="">short horizon (7.5 h)</td><td class="n">2216</td><td class="n">+4.8%</td></tr><tr><td class="">very short horizon (1 h)</td><td class="n">2254</td><td class="n">+6.6%</td></tr><tr><td class="">open or shut only</td><td class="n">2115</td><td class="n">+0.0%</td></tr></tbody><caption>Full controller: 2115 degree-minutes. Measured on Palo Alto, CA, the climate the fan penalty was tuned on.</caption></table></div>
+
+<p>The controller needs a weather forecast, but it does not need an accurate one. Taking the forecast away, so that it has to assume the weather stays as it is now, costs 9%. Swapping the realistic forecast for a perfect one changes the result by only +0.2%, which is within the run-to-run noise. Nearly all of the useful information is in the daily rise and fall of the temperature, and a clock gives you that for nothing. So a free public forecast is enough, and there is no need for a weather station on site.</p>
+
+<h2 id="room">The room</h2>
+
+<p>The room is a 4 by 3 by 2.5 m bedroom of medium-weight construction. It has one window that opens, a 25 W fan, people in it for part of the day, and afternoon sun falling on the glass.</p>
+
+<p>The model tracks two temperatures: the air and furniture together, and the structure. The structure stores 1.5 MJ/K of heat, roughly 10 times as much as the air, and that store is what the whole strategy runs on. Cold you put into the walls at 4 am is still there at 3 pm.</p>
+
+<pre>[gains] --&gt; ( indoor air ) &lt;--&gt; ( structure ) &lt;--&gt; outdoors
+                  |
+                  +------- window and fan -------&gt; outdoors</pre>
+
+<div class="tw"><table><thead><tr><th class=""></th><th class="n">Value</th><th class=""></th></tr></thead><tbody><tr><td class="">Volume</td><td class="n">30 m³</td><td class=""></td></tr><tr><td class="">Air and furniture</td><td class="n">146 kJ/K</td><td class="">settles in an hour</td></tr><tr class="hi"><td class="">Structure</td><td class="n">1.5 MJ/K</td><td class="">7.4 h time constant</td></tr><tr><td class="">Heat loss, window shut</td><td class="n">21.9 W/K</td><td class="">envelope plus 0.8 air changes/h</td></tr><tr><td class="">Window open</td><td class="n">141 W/K</td><td class="">14 air changes/h</td></tr><tr><td class="">Fan on top</td><td class="n">161 W/K</td><td class="">another 16 air changes/h</td></tr><tr><td class="">Heat gains</td><td class="n">156 W mean, 344 W peak</td><td class="">peak at 17:00</td></tr></tbody></table></div>
+
+<figure><img src="results/figures/rep_gains.png" alt="Stacked area chart of internal and solar heat gain against hour of day, peaking in the late afternoon."><figcaption>Heat gains peak in the late afternoon, which is also when the outside air is too warm to carry the heat away. Timing matters because those two things do not line up.</figcaption></figure>
+
+<p>I checked the equations against hand calculations worked out separately: energy conservation, the closed-form matrix exponential solution, a resistance network derived independently, Newton's law of cooling in the single-mass limit, and the fitted time constants against the predicted ones. All six checks agree, the last of them to within 0.4%.</p>
+
+<h2 id="weather">Weather data</h2>
+
+<figure><img src="results/figures/rep_climates.png" alt="Five panels of outdoor temperature over 48 hours for Palo Alto, Phoenix, Austin, Chicago and Seattle."><figcaption>Hourly observations from the Open-Meteo archive, real 2024 heat events. Cached in the repository so results reproduce offline.</figcaption></figure>
+
+<p>I picked five climates to cover the range a ventilation controller would actually meet. Phoenix, AZ averages 35 °C overnight and peaks at 46 °C, while Seattle and Palo Alto drop into the mid teens every night. That gap between them is what decides whether the controller has anything to work with.</p>
+
+<h2 id="using">Usage</h2>
+
+<pre>$ .venv/bin/python scripts/advise.py --location palo_alto
+
+Ventilation advice for Palo Alto, CA
+  outdoor 14.7 to 31.6 degC, overnight mean 16.4 degC
+
+Recommended schedule
+  Day 2
+    00:00 - 08:05  open fully             outdoor  16.2 degC
+    08:05 - 14:50  keep shut              outdoor  26.1 degC
+    14:50 - 18:05  open fully, fan on     outdoor  27.7 degC
+    18:05 - 24:00  open fully             outdoor  19.0 degC</pre>
+
+<p><code>--lat</code> and <code>--lon</code> work for any point on Earth, fetching the weather on demand. Room dimensions, construction and heat gains are in <code>windwindow/config.py</code>.</p>
+
+<h2 id="limits">Limitations</h2>
+
+<ul><li><strong>One room geometry.</strong> Medium-weight 30 m³ bedroom, west-facing window. A lightweight room has less structure to pre-cool, so it would gain less than this. All the room constants live in one file, so it would be easy to test.</li><li><strong>Two weather seeds per climate, two days each.</strong> That is enough to show the pattern is not an accident of one weather series, but not enough to put error bars on any of these numbers.</li><li><strong>Sensor calibration offset is modelled, never corrected.</strong> Each session draws a fixed 0.3 °C offset per sensor, shifting where the controller believes the threshold sits. A deployment would estimate and remove it; here every policy carries the same handicap.</li><li><strong>Humidity is absent.</strong> Austin's night air is warm and humid, and ventilating would import that moisture, so the gain shown there is optimistic.</li><li><strong>No shading, shutters or occupancy learning.</strong> Shading would do a similar job by keeping the heat out instead of flushing it out, and solar gain peaks at 344 W, so it would probably help a lot.</li><li><strong>The heat-gain schedule is given to the controller.</strong> Solar geometry is predictable and the occupancy pattern here is a coarse guess, so handing it over is defensible, but a real installation would have to learn the occupancy part from its own data.</li><li><strong>The planner searches locally.</strong> Bounded quasi-Newton from several starting schedules, keeping the best, with no guarantee of finding the global optimum. The perfect-information reference shows that all of this costs at most 0.7%.</li></ul>
+
+<h2 id="repro">Running it</h2>
+
+<pre>python3 -m venv .venv &amp;&amp; .venv/bin/pip install -r requirements.txt
+.venv/bin/python scripts/run_all.py          # all 14 steps
+.venv/bin/python scripts/run_all.py 10 11    # just those two
+.venv/bin/python scripts/advise.py --location seattle</pre>
+
+<p>Every step finishes with an acceptance check and exits non-zero if that check fails, and the driver stops at the first failure. The weather downloads once into <code>data/weather</code>, so everything after that runs offline. A full run takes 25 minutes, and nearly all of that is the two planning steps, which between them simulate about 140 room-days.</p>
+
+<div class="tw"><table><thead><tr><th class="n">Step</th><th class="">What it does</th><th class="">Check</th></tr></thead><tbody><tr><td class="n">00</td><td class="">Core invariants</td><td class="">63 checks on physics, weather, sensors, features</td></tr><tr><td class="n">01</td><td class="">Room model</td><td class="">sealed room warms smoothly to a limit</td></tr><tr><td class="n">02</td><td class="">Verify the thermal model</td><td class="">six hand calculations agree</td></tr><tr><td class="n">03</td><td class="">Synthetic weather</td><td class="">four scenarios generate and plot</td></tr><tr><td class="n">04</td><td class="">Window and fan</td><td class="">cools when cooler out, warms when hotter</td></tr><tr><td class="n">05</td><td class="">Sensor model</td><td class="">readings scatter around the truth, offsets persist</td></tr><tr><td class="n">06</td><td class="">Simulator and logger</td><td class="">one run gives a complete CSV</td></tr><tr><td class="n">07</td><td class="">Baselines</td><td class="">timer and threshold rule both run</td></tr><tr><td class="n">08</td><td class="">Fetch real weather</td><td class="">five climates cached, 48 h or more each</td></tr><tr><td class="n">09</td><td class="">Identification data</td><td class="">five climates, partial openings a third of rows</td></tr><tr><td class="n">10</td><td class="">Fit the room</td><td class="">capacities and time constant recovered, parameters physical</td></tr><tr><td class="n">11</td><td class="">Controller design</td><td class="">fan penalty selected, six variants run</td></tr><tr><td class="n">12</td><td class="">Evaluate by climate</td><td class="">beats a sealed room in every climate</td></tr><tr><td class="n">13</td><td class="">Figures and write-up</td><td class="">this page</td></tr></tbody></table></div>
+
+<p><code>REVAMP.md</code> records what changed from the first version of this project and why, including the mistakes worth knowing about.</p>
+
+<h2 id="layout">Files</h2>
+
+<pre>windwindow/
+  config.py       the room: sizes, capacities, conductances, gains
+  room.py         two-mass thermal model, RK4 and an exact solver
+  gains.py        occupants, equipment and sun, by clock time
+  realweather.py  cached hourly observations, interpolated
+  forecast.py     a forecast whose error grows with lead time
+  statespace.py   ten physical parameters fitted to logged data
+  mpc.py          the planning controller
+  sensors.py      offset, lag, noise, quantisation
+  policies.py     timer, threshold rule, fixed and random actions
+  simulator.py    runs any policy under identical conditions
+  doc.py          renders this write-up to Markdown and HTML
+  report2.py      this write-up, built from the result tables
+scripts/
+  run_all.py      the pipeline, halting at the first failure
+  advise.py       print a schedule for a place and a date
+  legacy/         the retired first version
+results/         13 figures, 8 tables
+data/
+  weather/        cached observations, committed
+  identify/       logged fitting sessions, regenerated
+  evaluate/       evaluation runs, regenerated</pre>
+<hr>
+<p><small>Generated from the result tables by <code>windwindow/report2.py</code>. Every number here is read out of a results file, so it can't drift from the code.</small></p>

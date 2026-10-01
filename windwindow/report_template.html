@@ -1,0 +1,735 @@
+<title>WindWindow Sim</title>
+<style>
+  /* Palette lifted from the figures so the page and the charts read as one
+     system. Light values on bare :root; dark redefined under both the OS
+     media query and an explicit theme stamp, so a toggle wins either way. */
+  :root {
+    color-scheme: light;
+    --surface:   #fcfcfb;
+    --plane:     #f9f9f7;
+    --raised:    #ffffff;
+    --ink:       #0b0b0b;
+    --ink-2:     #52514e;
+    --ink-muted: #898781;
+    --rule:      #e1e0d9;
+    --border:    rgba(11,11,11,0.10);
+    --blue:      #2a78d6;
+    --orange:    #eb6834;
+    --aqua:      #1baf7a;
+    --yellow:    #eda100;
+    --good:      #006300;
+    --card:      #ffffff;
+    --plate:     #fcfcfb;   /* backdrop for the light-background chart PNGs */
+    --shadow:    0 1px 2px rgba(11,11,11,0.05), 0 8px 24px rgba(11,11,11,0.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface:   #1a1a19;
+      --plane:     #0d0d0d;
+      --raised:    #232322;
+      --ink:       #ffffff;
+      --ink-2:     #c3c2b7;
+      --ink-muted: #898781;
+      --rule:      #2c2c2a;
+      --border:    rgba(255,255,255,0.10);
+      --blue:      #3987e5;
+      --orange:    #d95926;
+      --aqua:      #199e70;
+      --yellow:    #c98500;
+      --good:      #0ca30c;
+      --card:      #232322;
+      --plate:     #f4f4f1;
+      --shadow:    0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.25);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface:   #1a1a19;
+    --plane:     #0d0d0d;
+    --raised:    #232322;
+    --ink:       #ffffff;
+    --ink-2:     #c3c2b7;
+    --ink-muted: #898781;
+    --rule:      #2c2c2a;
+    --border:    rgba(255,255,255,0.10);
+    --blue:      #3987e5;
+    --orange:    #d95926;
+    --aqua:      #199e70;
+    --yellow:    #c98500;
+    --good:      #0ca30c;
+    --card:      #232322;
+    --plate:     #f4f4f1;
+    --shadow:    0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.25);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--plane);
+    color: var(--ink);
+    font: 16px/1.65 system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding-block: 0;
+    padding-inline: 20px;
+  }
+  .wrap { max-width: 61rem; margin: 0 auto; }
+
+  /* Prose stays narrow for readability; figures and tables break out wider. */
+  p, ul, ol, .prose { max-width: 39rem; }
+  p { margin: 0 0 1.05em; color: var(--ink-2); }
+  p strong, li strong { color: var(--ink); font-weight: 600; }
+  a { color: var(--blue); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  header.hero {
+    padding-block: 3.2rem 1.6rem;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 2.2rem;
+  }
+  .eyebrow {
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.09em;
+    text-transform: uppercase; color: var(--ink-muted); margin-bottom: 0.7rem;
+  }
+  h1 {
+    font-size: clamp(1.9rem, 5.2vw, 2.9rem); line-height: 1.1;
+    letter-spacing: -0.021em; margin: 0 0 0.75rem; font-weight: 640;
+  }
+  .lede { font-size: 1.075rem; color: var(--ink-2); max-width: 41rem; margin-bottom: 0.4rem; }
+
+  h2 {
+    font-size: 1.32rem; letter-spacing: -0.012em; margin: 3.4rem 0 0.35rem;
+    font-weight: 640; scroll-margin-top: 1.5rem;
+  }
+  h2 + .sub { color: var(--ink-muted); font-size: 0.9rem; margin: 0 0 1.4rem; max-width: 39rem; }
+  h3 { font-size: 1.02rem; margin: 2.2rem 0 0.6rem; font-weight: 620; }
+
+  /* ---- contents ---- */
+  nav.toc { margin: 0 0 0.6rem; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  nav.toc a {
+    font-size: 0.78rem; color: var(--ink-2); text-decoration: none;
+    padding: 0.3rem 0.62rem; border: 1px solid var(--border);
+    border-radius: 999px; background: var(--surface); white-space: nowrap;
+  }
+  nav.toc a:hover { border-color: var(--blue); color: var(--blue); }
+
+  /* ---- goal scorecard ---- */
+  .cards {
+    display: grid; gap: 0.7rem; margin: 1.6rem 0 0;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 0.95rem 1rem 1rem;
+    box-shadow: var(--shadow);
+  }
+  .card .gid {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em;
+    color: var(--ink-muted); text-transform: uppercase;
+  }
+  /* Cards are a flex column so the big numbers line up across all four even
+     when the descriptions run to different numbers of lines. */
+  .card { display: flex; flex-direction: column; }
+  .card .what {
+    font-size: 0.82rem; color: var(--ink-2); margin: 0.15rem 0 0.55rem;
+    line-height: 1.35; min-height: 2.25rem;
+  }
+  .card .verdict { margin-top: auto; padding-top: 0.6rem; }
+  .card .val {
+    font-size: 1.62rem; font-weight: 640; letter-spacing: -0.02em;
+    line-height: 1; color: var(--ink);
+  }
+  .card .tgt { font-size: 0.76rem; color: var(--ink-muted); margin-top: 0.3rem; }
+  .verdict {
+    display: inline-flex; align-items: flex-start; gap: 0.3rem;
+    font-size: 0.73rem; font-weight: 650; color: var(--good);
+  }
+  .verdict svg { margin-top: 0.22em; }
+  .card.miss .verdict { color: var(--orange); }
+  .verdict svg { width: 12px; height: 12px; flex: none; }
+
+  /* ---- figures ---- */
+  figure { margin: 1.5rem 0 2rem; max-width: none; }
+  .plate {
+    background: var(--plate); border: 1px solid var(--border);
+    border-radius: 12px; padding: 0.5rem; box-shadow: var(--shadow);
+    cursor: zoom-in;
+  }
+  .plate img { display: block; width: 100%; height: auto; border-radius: 7px; }
+  figcaption {
+    font-size: 0.8rem; color: var(--ink-muted); margin-top: 0.6rem;
+    max-width: 44rem; line-height: 1.5;
+  }
+  figcaption b { color: var(--ink-2); font-weight: 600; }
+
+  /* ---- tables ---- */
+  .tw { overflow-x: auto; margin: 1.2rem 0 1.9rem; }
+  table { border-collapse: collapse; font-size: 0.86rem; min-width: 22rem; }
+  th, td { text-align: left; padding: 0.47rem 0.85rem 0.47rem 0; border-bottom: 1px solid var(--rule); }
+  th {
+    font-size: 0.72rem; font-weight: 650; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--ink-muted); white-space: nowrap;
+  }
+  td { color: var(--ink-2); }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; padding-right: 1.1rem; }
+  tr.hi td { color: var(--ink); font-weight: 600; }
+  td.win { color: var(--blue); font-weight: 650; }
+  caption {
+    caption-side: bottom; text-align: left; font-size: 0.78rem;
+    color: var(--ink-muted); padding-top: 0.6rem; max-width: 42rem;
+  }
+
+  /* inline bar for the input-importance table */
+  .bar { display: flex; align-items: center; gap: 0.5rem; min-width: 8rem; }
+  .bar i {
+    height: 7px; border-radius: 4px; background: var(--blue);
+    display: block; flex: none;
+  }
+  .bar span { font-variant-numeric: tabular-nums; font-size: 0.8rem; color: var(--ink-2); }
+
+  /* ---- code / rule block ---- */
+  pre {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 0.95rem 1.1rem; overflow-x: auto;
+    font: 0.82rem/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: var(--ink-2); margin: 1.1rem 0 1.6rem; max-width: 44rem;
+  }
+  pre b { color: var(--ink); font-weight: 600; }
+  code {
+    font: 0.86em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 4px; padding: 0.08em 0.34em; color: var(--ink);
+  }
+
+  /* ---- callout ---- */
+  .note {
+    border-left: 3px solid var(--orange); background: var(--surface);
+    border-radius: 0 10px 10px 0; padding: 0.9rem 1.1rem;
+    margin: 1.4rem 0 1.8rem; max-width: 41rem;
+  }
+  .note p { margin: 0; font-size: 0.93rem; }
+  .note p + p { margin-top: 0.7rem; }
+  .note .tag {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--orange); display: block;
+    margin-bottom: 0.35rem;
+  }
+  .note.good { border-left-color: var(--aqua); }
+  .note.good .tag { color: var(--aqua); }
+
+  /* ---- method list ---- */
+  .method { list-style: none; padding: 0; margin: 1.3rem 0 1.9rem; max-width: 41rem; }
+  .method li { padding: 0 0 1.05rem 0; }
+  .method li:last-child { padding-bottom: 0; }
+  .method h4 { margin: 0 0 0.25rem; font-size: 0.93rem; font-weight: 640; color: var(--ink); }
+  .method p { margin: 0; font-size: 0.9rem; }
+
+  footer {
+    margin-top: 4rem; padding-block: 1.6rem 3rem;
+    border-top: 1px solid var(--rule); color: var(--ink-muted); font-size: 0.82rem;
+  }
+  footer p { color: var(--ink-muted); max-width: 44rem; }
+
+  /* ---- lightbox: these charts are dense, so let people enlarge them ---- */
+  #lb {
+    position: fixed; inset: 0; background: rgba(8,8,8,0.82);
+    display: none; align-items: center; justify-content: center;
+    padding: 20px; z-index: 50; cursor: zoom-out;
+  }
+  #lb.on { display: flex; }
+  #lb img {
+    max-width: 100%; max-height: 100%; border-radius: 8px;
+    background: #fcfcfb; padding: 6px;
+  }
+  #lb .hint {
+    position: absolute; bottom: 14px; left: 0; right: 0; text-align: center;
+    color: rgba(255,255,255,0.7); font-size: 0.76rem;
+  }
+  @media (max-width: 640px) {
+    body { padding-inline: 16px; }
+    header.hero { padding-block: 2.2rem 1.2rem; }
+    .card .val { font-size: 1.42rem; }
+    /* Stacked cards do not need to line their numbers up with each other. */
+    .card .what { min-height: 0; }
+  }
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">Simulation study &middot; 36 paired runs</div>
+  <h1>WindWindow Sim</h1>
+  <p class="lede">
+    A software simulation of a small heated room with a controllable window and
+    fan, used to test whether a learned controller can decide when to ventilate
+    better than two conventional alternatives. The controller predicts how much
+    the indoor air temperature will change over the next ten minutes under each
+    action available to it, then selects the action with the lowest predicted
+    temperature.
+  </p>
+  <p class="lede" style="font-size:1rem">
+    Four objectives were fixed before implementation began. Three were met.
+    The fourth was not, and the analysis below establishes that its target
+    exceeds the largest reduction any controller can achieve in this room.
+  </p>
+  <nav class="toc" aria-label="Contents">
+    <a href="#summary">Results summary</a>
+    <a href="#model">1. Thermal model</a>
+    <a href="#scenarios">2. Weather scenarios</a>
+    <a href="#rule">3. Baseline rule</a>
+    <a href="#predictor">4. Predictor and control rule</a>
+    <a href="#controls">5. Experimental controls</a>
+    <a href="#comparison">6. Policy comparison</a>
+    <a href="#objectives">7. Objective interaction</a>
+    <a href="#limits">8. Limitations</a>
+    <a href="#repro">9. Reproducibility</a>
+  </nav>
+
+  <div class="cards">
+    <div class="card">
+      <div class="gid">G1</div>
+      <div class="what">Predict the 10-minute temperature change</div>
+      <div class="val">{{G1_MAE}} &deg;C</div>
+      <div class="tgt">target &le; 0.25 &deg;C &middot; floor {{G1_FLOOR}} &deg;C</div>
+      <div class="verdict"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3.2L13 5"/></svg>Met</div>
+    </div>
+    <div class="card">
+      <div class="gid">G2</div>
+      <div class="what">Correct open/shut decisions vs the baseline rule</div>
+      <div class="val">{{G2_SMALL}}%</div>
+      <div class="tgt">target &ge; 90% &middot; {{G2_BIG}}% vs {{G2_RULE_BIG}}% at n = {{N_BIG}}</div>
+      <div class="verdict"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3.2L13 5"/></svg>Met</div>
+    </div>
+    <div class="card miss">
+      <div class="gid">G3</div>
+      <div class="what">Reduction in time above 26 &deg;C relative to a timer</div>
+      <div class="val">{{G3_PCT}}%</div>
+      <div class="tgt">target &ge; 30% &middot; ceiling {{G3_CEIL}}%</div>
+      <div class="verdict"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>Not met. Target exceeds the physical ceiling.</div>
+    </div>
+    <div class="card">
+      <div class="gid">G4</div>
+      <div class="what">Reduction in fan runtime relative to a timer</div>
+      <div class="val">{{G4_PCT}}%</div>
+      <div class="tgt">target &ge; 30% &middot; identical figure in watt-hours</div>
+      <div class="verdict"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3.2L13 5"/></svg>Met</div>
+    </div>
+  </div>
+</header>
+
+<h2 id="summary">Results summary</h2>
+<p class="sub">Measured over 36 runs: three policies, four weather scenarios, three repeats of each combination.</p>
+
+<figure>
+  <div class="plate"><img src="results/figures/step14_results.png" alt="Bar charts. Left: degree-minutes above 26 degrees Celsius for the timer, the baseline rule and the model across four weather scenarios, with horizontal rules marking the best value any controller could reach. Right: fan minutes per run for the three policies, against the G4 target line."></div>
+  <figcaption><b>Comfort and energy outcomes by policy.</b> Weather seeds 11 to 13, none of which appear in the training data. Each bar is the mean of three repeats. The horizontal rules mark the result obtained by a controller with perfect knowledge of the room state and of future weather.</figcaption>
+</figure>
+
+<h3>Objective G3</h3>
+<p>The model reduced degree-minutes above 26 &deg;C by {{G3_PCT}}% relative to
+the timer, against a target of 30%. To establish whether the target was
+attainable, a reference controller was given the true state of the room and the
+true future outdoor temperature, and allowed to select the best action at every
+control step. That controller achieved {{G3_CEIL}}%. The learned model therefore
+captured {{G3_SHARE}}% of the reduction available to any controller.</p>
+
+<p>The limit arises from the physics of ventilation. In the hot scenario the
+outdoor air stays above 26 &deg;C for the whole run, and ventilation cannot
+bring a room below the temperature of the air entering it. The target was set
+before this ceiling was known.</p>
+
+<h3>Objective G2</h3>
+<p>The model made the correct decision in {{G2_SMALL}}% of the 30 paired trials
+specified in the plan, which satisfies the 90% requirement. Demonstrating an
+improvement over the baseline rule required a larger sample. The two methods
+differ by roughly {{G2_GAP}} percentage points, so a sample of 30 trials
+usually contains no disagreement between them at all.</p>
+
+<p>Over 2000 random draws of 30 trials, the model led in {{RS_AHEAD}}% of draws,
+tied in {{RS_TIED}}%, and trailed in {{RS_BEHIND}}%. At n = {{N_BIG}} the model
+was correct in {{G2_BIG}}% of trials against {{G2_RULE_BIG}}% for the baseline
+rule. All {{G2_DISAGREE}} disagreements favoured the model
+(McNemar test, p = {{MCNEMAR}}).</p>
+
+<h2 id="model">1. Thermal model</h2>
+<p class="sub">Two thermal masses, three heat-transfer paths, and one internal heat source.</p>
+
+<p>The room is a plywood box measuring 600 by 400 by 400 mm, enclosing roughly
+66 L of air, with a 17.6 W heater inside. It is represented as two lumped
+thermal masses connected by conductive paths:</p>
+
+<pre>[17.6 W heater] --&gt; ( <b>indoor air</b> ) &lt;--&gt; ( <b>plywood shell</b> ) &lt;--&gt; outdoors
+                          |
+                          +------- window and fan -------&gt; outdoors</pre>
+
+<p>A thermal conductance is measured in watts per kelvin and gives the heat
+flow produced by one degree of temperature difference. A thermal capacitance is
+measured in joules per kelvin and gives the energy required to raise a mass by
+one degree.</p>
+
+<p>The two masses differ by a factor of four, which is the source of the
+control problem:</p>
+
+<div class="tw"><table>
+  <thead><tr><th>Thermal mass</th><th class="n">Capacitance</th><th>Composition</th></tr></thead>
+  <tbody>
+    <tr><td>Indoor air and fittings</td><td class="n">{{C_IN}} J/K</td><td>the air contributes little; internal mounts and trim dominate</td></tr>
+    <tr><td>Plywood shell</td><td class="n">{{C_WALL}} J/K</td><td>{{MASS_WALL}} kg of wood, storing {{C_WALL_KJ}} kJ per degree</td></tr>
+  </tbody>
+</table></div>
+
+<p>The air therefore responds within a few minutes while the shell takes around
+half an hour. The time constants below were obtained from the eigenvalues of
+the linearised system:</p>
+
+<div class="tw"><table>
+  <thead><tr><th>Window state</th><th class="n">Fast mode (air)</th><th class="n">Slow mode (shell)</th></tr></thead>
+  <tbody>
+    <tr><td>Shut</td><td class="n">{{TF_SHUT}} min</td><td class="n">{{TS_SHUT}} min</td></tr>
+    <tr><td>Open, fan off</td><td class="n">{{TF_OPEN}} min</td><td class="n">{{TS_OPEN}} min</td></tr>
+    <tr><td>Open, fan on</td><td class="n">{{TF_FAN}} min</td><td class="n">{{TS_FAN}} min</td></tr>
+  </tbody>
+  <caption>The ten-minute prediction horizon falls between the two modes. Within that interval the air has largely responded to a change in action while the shell has not, so the outcome depends on how much heat the shell still holds.</caption>
+</table></div>
+
+<h3>1.1 Effect of airflow on wall heat transfer</h3>
+<p>Opening the window admits outdoor air and also sets the indoor air in
+motion. Moving air reduces the thickness of the boundary layer at the inner
+wall surface, which raises the surface heat-transfer coefficient and increases
+the rate of heat exchange between the shell and the air:</p>
+
+<div class="tw"><table>
+  <thead><tr><th>Window state</th><th class="n">Inner surface coefficient</th><th class="n">Air to shell conductance</th></tr></thead>
+  <tbody>
+    <tr><td>Shut</td><td class="n">{{H_SHUT}} W/(m&sup2;&middot;K)</td><td class="n">{{K_SHUT}} W/K</td></tr>
+    <tr><td>Open, fan off</td><td class="n">{{H_OPEN}} W/(m&sup2;&middot;K)</td><td class="n">{{K_OPEN}} W/K</td></tr>
+    <tr><td>Open, fan on</td><td class="n">{{H_FAN}} W/(m&sup2;&middot;K)</td><td class="n">{{K_FAN}} W/K</td></tr>
+  </tbody>
+</table></div>
+
+<p>This effect produces a measurable rebound. Starting from a room whose shell
+has been heated, an eight-minute period of ventilation with the window open and
+the fan running lowers the air temperature substantially. If the window is then
+shut, the air temperature rises again by {{REBOUND}} &deg;C, because the shell
+is still warm and the enclosed air provides the only path for that stored heat.
+If the window is instead left open, the air temperature continues to fall.</p>
+
+<p>A controller that shuts the window as soon as the air reading is acceptable
+will therefore incur this rebound repeatedly. The shell temperature is included
+among the model inputs for this reason.</p>
+
+<figure>
+  <div class="plate"><img src="results/figures/step04_window_fan.png" alt="Three line charts showing indoor air temperature over time. Opening the window cools the room when it is cool outside, warms it when it is hot outside, and shutting the window after an eight minute flush allows a warm shell to reheat the air."></div>
+  <figcaption><b>Measured effect of the window and fan.</b> Left: with outdoor air at 18 &deg;C, opening the window lowers the air temperature. Centre: with outdoor air at 31 &deg;C and the room initially cool, opening raises it, and raises it faster than leaving the window shut for the first 24 minutes. Right: the rebound that follows shutting the window while the shell is still warm.</figcaption>
+</figure>
+
+<h2 id="scenarios">2. Weather scenarios</h2>
+<p class="sub">Four outdoor temperature profiles, each generated from a smooth base curve plus stochastic fluctuations.</p>
+
+<div class="tw"><table>
+  <thead><tr><th>Scenario</th><th>Outdoor range</th><th>Control difficulty</th></tr></thead>
+  <tbody>
+    <tr><td>Cool outside</td><td class="n">16 to 20 &deg;C</td><td>ventilation overshoots easily; the risk is cooling the room below the 24 &deg;C floor</td></tr>
+    <tr><td>Hot outside</td><td class="n">27 to 32 &deg;C</td><td>outdoor air is initially warmer than indoor air, so ventilation adds heat until the two cross over</td></tr>
+    <tr><td>Hot, then cooling</td><td class="n">30 falling to 19 &deg;C</td><td>the five-minute outdoor trend carries information about the coming ten minutes</td></tr>
+    <tr><td>Warm shell, cooler outside</td><td class="n">23 to 26 &deg;C</td><td>the shell begins about {{SHELL_GAP}} K above outdoor air, so the rebound described in section 1.1 applies</td></tr>
+  </tbody>
+</table></div>
+
+<figure>
+  <div class="plate"><img src="results/figures/step03_scenarios.png" alt="Four panels of outdoor temperature against time over three hours, each showing three random seeds, for the cool, hot, hot-then-cooling and warm-shell scenarios."></div>
+  <figcaption><b>Outdoor temperature profiles.</b> The solid line is seed 1; the faded lines are seeds 2 and 3. The fluctuation component prevents the outdoor series from being a smooth curve that a predictor could extrapolate trivially, and gives the five-minute trend input a non-zero variance to work with.</figcaption>
+</figure>
+
+<h2 id="rule">3. Baseline rule and its failure modes</h2>
+<p class="sub">The conventional rule opens the window whenever outdoor air is cooler than indoor air. It was correct in {{G2_RULE_BIG}}% of paired trials.</p>
+
+<p>The rule fails in a single, consistent way. It does not account for the
+internal heat source. A sealed room containing 17.6 W settles at
+{{SHUT_RISE}} K above the outdoor temperature, so ventilation can be the
+better action even when outdoor air is slightly warmer than indoor air at the
+moment of the decision, because the sealed alternative continues to warm.</p>
+
+<p>All {{RULE_WRONG}} errors the rule made across {{N_BIG}} trials were of this
+type: the window was kept shut when opening was the better action. These cases
+occur where indoor and outdoor temperatures are close together, with a mean
+difference of {{RULE_DOUT}} &deg;C.</p>
+
+<p>The rule also has no access to the shell temperature, so it cannot
+anticipate the rebound described in section 1.1.</p>
+
+<figure>
+  <div class="plate"><img src="results/figures/step14_trials.png" alt="Left: scatter plot of 400 paired trials in the plane of outdoor minus indoor temperature against shell minus indoor temperature, with the baseline rule's errors clustered near zero temperature difference. Right: bar chart of incorrect decisions, 0.5 percent for the model against 4.5 percent for the baseline rule."></div>
+  <figcaption><b>Distribution of decision errors across {{N_BIG}} paired trials.</b> In each trial the room was held at a fixed state and then simulated forward for ten minutes under both actions using the true weather series, which establishes the correct decision. The errors made by the baseline rule cluster in a narrow band where indoor and outdoor temperatures are nearly equal.</figcaption>
+</figure>
+
+<h2 id="predictor">4. Predictor and control rule</h2>
+<p class="sub">Nine inputs, specified in advance, and a control rule based on counterfactual prediction.</p>
+
+<p>In the table below, <code>u</code> denotes the window opening on a scale of
+0 to 1, <code>f</code> the fan speed on the same scale, and
+<code>d</code> the difference between outdoor and indoor temperature. The final
+column gives each input's share of the total split gain in the gradient-boosted
+model.</p>
+
+<div class="tw"><table>
+  <thead><tr><th>Input</th><th>Quantity represented</th><th class="n">Share of split gain</th></tr></thead>
+  <tbody>
+{{INPUT_ROWS}}
+  </tbody>
+</table></div>
+
+<p>Two features of this input set are relevant to the control rule. Every input
+is a function of the state and the action together, so a trained model can be
+evaluated counterfactually: the predicted outcome of shutting the window and
+the predicted outcome of opening it with the fan running are both obtained from
+the same measured state. The four inputs that carry <code>u</code> as a factor
+vanish when the window is shut, since they describe transport processes that
+require air movement.</p>
+
+<p>The largest single contribution comes from the indoor temperature trend, at
+{{TOP_SHARE}}%. The two inputs describing the shell together account for
+{{WALL_SHARE}}% of the split gain, which quantifies the contribution of stored
+wall heat to the prediction. The baseline rule has no equivalent term.</p>
+
+<h3>4.1 Control rule</h3>
+<pre><b>benefit</b> = predicted change if shut - predicted change if open with fan
+
+<b>open</b>   if benefit &gt; {{OPEN_TH}} &deg;C
+<b>shut</b>   if benefit &lt; {{CLOSE_TH}} &deg;C
+minimum interval between window movements: {{DWELL}} min
+<b>shut</b>   if indoor temperature &lt; {{FLOOR_C}} &deg;C
+<b>fan on</b> only if it improves on the window alone by more than {{FAN_MARGIN}} &deg;C</pre>
+
+<p>The opening and closing thresholds differ, which creates a dead band. With a
+single threshold, a benefit estimate fluctuating around that value would cause
+the window to change state at every control interval.</p>
+
+<figure>
+  <div class="plate"><img src="results/figures/step11_model_hot_walls_cold_outside.png" alt="Three stacked panels: indoor, shell and outdoor temperature over three hours; the controller's predicted benefit and fan gain with the dead band shaded; and the resulting window and fan states."></div>
+  <figcaption><b>Controller behaviour in the warm-shell scenario.</b> The centre panel shows the quantities the control rule acts on. The controller continues to ventilate through the rebound period and leaves the fan off whenever its predicted contribution falls below {{FAN_MARGIN}} &deg;C.</figcaption>
+</figure>
+
+<h3>4.2 Choice of predictor</h3>
+<div class="tw"><table>
+  <thead><tr><th>Predictor</th><th class="n">Cross-validated MAE</th><th class="n">Held-out MAE</th><th>Note</th></tr></thead>
+  <tbody>
+{{MODEL_ROWS}}
+  </tbody>
+  <caption>Mean absolute error in &deg;C. The ensemble was selected by grouped cross-validation within the training sessions, before any held-out score was computed. It is also the best performer on the held-out sessions, but that result did not inform the selection.</caption>
+</table></div>
+
+<p>The trend baseline is worth noting. Extrapolating the preceding five minutes
+across the following ten produces a larger error than assuming no change at all
+({{TREND_MAE}} &deg;C against {{ZERO_MAE}} &deg;C). It also cannot distinguish
+between actions, since it ignores <code>u</code> and <code>f</code>, so it
+provides no basis for control.</p>
+
+<figure>
+  <div class="plate"><img src="results/figures/step10_models.png" alt="Three panels: held-out mean absolute error for five predictors against the G1 target and the physics floor; share of split gain per input; and predicted against observed temperature change for the selected model."></div>
+  <figcaption><b>Prediction error for each candidate, with the attainable floor.</b> The floor is the error of an exact physical model evaluated with the outdoor temperature held at its current value. Since none of the nine inputs contains a weather forecast, no model built from them can improve on it.</figcaption>
+</figure>
+
+<h2 id="controls">5. Experimental controls</h2>
+<p class="sub">Six procedures used to prevent the reported figures from overstating performance.</p>
+
+<ul class="method">
+  <li>
+    <h4>5.1 Randomised actions during data collection</h4>
+    <p>A competent policy opens the window only when doing so is beneficial, so
+    its logs contain few examples of ventilating under unfavourable conditions.
+    Predicting those conditions is the model's primary function. Accordingly,
+    {{N_RANDOM}} of the {{N_SESSIONS}} training sessions used randomised
+    actions. The remainder held a single action constant for four hours from a
+    deliberately extreme initial state, following standard practice for thermal
+    system identification.</p>
+  </li>
+  <li>
+    <h4>5.2 Splitting by session rather than by row</h4>
+    <p>Consecutive rows are 30 s apart, and the lag-1 autocorrelation of indoor
+    temperature within a session is {{AUTOCORR}}. Adjacent rows are therefore
+    near-duplicate measurements, and a random split at the row level places a
+    near-duplicate of almost every test row in the training set. Trained and
+    scored that way, the selected model reports {{LEAKY_MAE}} &deg;C, which is
+    lower than the attainable floor of {{G1_FLOOR}} &deg;C. That result is not
+    physically possible and identifies the leakage.</p>
+  </li>
+  <li>
+    <h4>5.3 Exclusion of rows with a changing action</h4>
+    <p>A row was retained only if <code>u</code> and <code>f</code> remained
+    constant throughout the ten-minute horizon. Otherwise the recorded outcome
+    combines two different actions and does not correspond to either. This
+    criterion excluded {{DROPPED}}% of logged rows.</p>
+  </li>
+  <li>
+    <h4>5.4 Separation of weather series</h4>
+    <p>The 36 evaluation runs used weather seeds 11 to 13. Training used seeds
+    101 to 108 and 300 to 305. The paired trials used seeds 21 to 23. No seed
+    appears in more than one role.</p>
+  </li>
+  <li>
+    <h4>5.5 Paired runs</h4>
+    <p>Within each combination of scenario and repeat, all three policies
+    received identical outdoor temperature series, identical initial states and
+    identical sensor calibration offsets. Differences between policies within a
+    cell are therefore attributable to the policy alone.</p>
+  </li>
+  <li>
+    <h4>5.6 Computation of attainable limits</h4>
+    <p>For objectives G1 and G3 the best attainable result was computed exactly
+    from the governing equations. A target is interpretable only in relation to
+    that limit.</p>
+  </li>
+</ul>
+
+<div class="tw"><table>
+  <thead><tr><th>Reference predictor</th><th class="n">MAE</th><th>Information available</th></tr></thead>
+  <tbody>
+{{ORACLE_ROWS}}
+  </tbody>
+  <caption>Of the {{G1_FLOOR}} &deg;C floor, {{O_PERFECT}} &deg;C is attributable to sensor noise in the label and the remaining {{O_WEATHER}} &deg;C to the absence of a weather forecast. The G1 target of 0.25 &deg;C leaves 0.066 &deg;C of margin above the floor.</caption>
+</table></div>
+
+<h2 id="comparison">6. Policy comparison</h2>
+<p class="sub">36 runs of three simulated hours each: three policies, four scenarios, three repeats.</p>
+
+<div class="tw"><table>
+  <thead><tr><th>Measure</th><th class="n">Timer</th><th class="n">Baseline rule</th><th class="n">Model</th></tr></thead>
+  <tbody>
+{{POLICY_ROWS}}
+  </tbody>
+  <caption>Values are means across the 12 runs per policy, except peak indoor temperature, which is the maximum.</caption>
+</table></div>
+
+<p>The principal result concerns energy rather than temperature. The model
+achieved comparable comfort to the baseline rule while using {{FAN_SAVE}}% less
+fan runtime and {{MOVE_SAVE}}% fewer window movements.</p>
+
+<p>The comfort figures were close but not identical. The model recorded
+{{M_DM}} degree-minutes above 26 &deg;C against {{R_DM}} for the baseline rule,
+a difference of {{DM_WORSE}}%, and reached a lower peak temperature
+({{M_PEAK}} &deg;C against {{R_PEAK}} &deg;C). Both differences are small
+relative to the {{FAN_SAVE}}% difference in fan energy.</p>
+
+<p>The baseline rule obtains its comfort result by ventilating whenever outdoor
+air is cooler and running the fan throughout, which amounts to
+{{RULE_FAN_MORE}}% more fan runtime than the timer. The model ventilated for
+longer than the baseline rule ({{M_OPEN}} minutes against {{R_OPEN}}), since
+window opening carries no energy cost, but operated the fan only when its
+predicted contribution justified it.</p>
+
+<figure>
+  <div class="plate"><img src="results/figures/step14_policies.png" alt="Top: indoor temperature for the three controllers on identical weather, with the timer producing a large sawtooth. Bottom: bands indicating when each controller had the window open and the fan running."></div>
+  <figcaption><b>Three controllers on identical weather, warm-shell scenario, seed 11.</b> The timer's sawtooth reflects scheduled ventilation followed by unopposed rebound. The baseline rule ran its fan for the full {{TRAP_RULE_FAN}} minutes; the model obtained comparable comfort using {{TRAP_MODEL_FAN}} minutes.</figcaption>
+</figure>
+
+<h2 id="objectives">7. Interaction between the comfort and energy objectives</h2>
+<p class="sub">Objectives G3 and G4 are in partial opposition in this room.</p>
+
+<p>Ventilation is beneficial under most conditions here, because a sealed room
+containing 17.6 W settles {{SHUT_RISE}} K above outdoor temperature. A
+controller optimising for comfort therefore ventilates for longer than a timer
+operating at 50% duty, not for less time. If such a controller also runs the
+fan whenever the fan provides any benefit, its fan runtime exceeds the timer's
+and objective G4 fails.</p>
+
+<p>The window and the fan are separate decisions, which resolves the conflict.
+The window accounts for most of the cooling and costs nothing to open. The fan
+adds a smaller increment at a cost of 2.5 W. A controller can therefore
+ventilate freely while operating the fan selectively. The selectivity is set by
+the fan margin, specified in the plan as {{FAN_MARGIN}} &deg;C and swept
+below.</p>
+
+<figure>
+  <div class="plate"><img src="results/figures/step11_fan_tradeoff.png" alt="Scatter plot of comfort improvement against fan energy improvement for nine fan margin settings, with the region satisfying both objectives shaded and never entered, and a ceiling line lying below the G3 target."></div>
+  <figcaption><b>Comfort against fan energy across nine fan-margin settings.</b> Every setting satisfies G4 by a wide margin. No setting satisfies G3, because the G3 target of 30% lies above the {{G3_CEIL_SEED1}}% ceiling established by the reference controller. The value specified in the plan, {{FAN_MARGIN}} &deg;C, gives the best comfort result among the settings that satisfy G4, so no revision was required.</figcaption>
+</figure>
+
+<div class="tw"><table>
+  <thead><tr><th>Policy</th><th class="n">Degree-minutes above 26 &deg;C</th><th class="n">Change vs timer</th></tr></thead>
+  <tbody>
+{{BOUND_ROWS}}
+  </tbody>
+  <caption>The reference controller improves only marginally on continuous ventilation at full fan speed, which indicates that the comfort-optimal policy in this room is close to continuous maximum ventilation. That policy is also the least efficient. The reference controller reaches {{G3_CEIL}}%, so the G3 target of 30% was not attainable.</caption>
+</table></div>
+
+<h2 id="limits">8. Limitations</h2>
+
+<ul>
+  <li><strong>The G3 target is not attainable in this room.</strong> The model
+  achieved {{G3_PCT}}% against a ceiling of {{G3_CEIL}}%. The shortfall is a
+  property of the objective rather than of the controller.</li>
+  <li><strong>The specified sample of 30 paired trials is underpowered.</strong>
+  It cannot separate the model from the baseline rule at a difference of
+  {{G2_GAP}} percentage points. The larger sample was added for this reason.</li>
+  <li><strong>Prediction accuracy is worst in the hot-then-cooling scenario</strong>,
+  at {{WORST_MAE}} &deg;C, above the 0.25 &deg;C target. Outdoor temperature
+  changes fastest in that scenario and the attainable floor is correspondingly
+  higher, at {{WORST_FLOOR}} &deg;C. The target was met in the other three
+  scenarios ({{OTHER_MAES}} &deg;C).</li>
+  <li><strong>The fan specification was revised during the study.</strong> An
+  initial value of 8 L/s for a 2.5 W fan corresponds to 436 air changes per hour
+  in a 66 L enclosure, which that fan cannot deliver. It was reduced to
+  {{FAN_LPS}} L/s, or {{FAN_ACH}} air changes per hour. The error was noticed
+  while investigating excessive fan use by the controller and was corrected on
+  physical grounds; all downstream steps were regenerated. The revision changed
+  the G1 result from 0.264 &deg;C to {{G1_MAE}} &deg;C, so the sequence of
+  events is recorded here.</li>
+  <li><strong>The warm shell is an initial condition, not a solar gain model.</strong>
+  The warm-shell scenario begins with the shell approximately {{SHELL_GAP}} K
+  above outdoor temperature. Modelling solar gain explicitly was excluded from
+  scope.</li>
+  <li><strong>Humidity, measured weather data and alternative room geometries
+  were not investigated.</strong></li>
+</ul>
+
+<h2 id="repro">9. Reproducibility</h2>
+<pre>python3 -m venv .venv &amp;&amp; .venv/bin/pip install -r requirements.txt
+.venv/bin/python scripts/run_all.py          <span style="color:var(--ink-muted)"># all steps in order</span>
+.venv/bin/python scripts/run_all.py 10 13    <span style="color:var(--ink-muted)"># steps 10 and 13 only</span></pre>
+
+<p>Each step concludes with an acceptance check and returns a non-zero exit code
+on failure, and the driver halts at the first failure, so an incorrect constant
+cannot propagate silently into the results. The complete pipeline of 15 steps,
+from validation of the governing equations to generation of this page, runs in
+approximately {{RUNTIME}} s.</p>
+
+<p>The thermal model is verified against independent calculations in step 2.
+The checks cover conservation of energy, agreement with the closed-form matrix
+exponential solution, agreement with a separately derived resistance network,
+agreement with Newton's law of cooling in the single-mass limit, and agreement
+between fitted and predicted time constants. All agree to within 1 part in
+10<sup>8</sup>.</p>
+
+<footer>
+  <p><strong>WindWindow Sim.</strong> 15 pipeline steps, {{N_SESSIONS}} training
+  sessions and {{N_RUNS}} paired evaluation runs. Every figure quoted on this
+  page is read from the result tables produced by the pipeline. The page is
+  generated rather than written by hand, so its contents cannot diverge from the
+  code.</p>
+  <p style="margin-top:0.8rem">Select any figure to view it at full size.</p>
+</footer>
+
+</div>
+
+<div id="lb" role="dialog" aria-modal="true" aria-label="Enlarged figure">
+  <img alt="">
+  <div class="hint">Select anywhere, or press Escape, to close</div>
+</div>
+
+<script>
+  // The figures are dense, so allow each to be opened at full size.
+  const lb = document.getElementById('lb');
+  const lbImg = lb.querySelector('img');
+  document.querySelectorAll('.plate').forEach(function (plate) {
+    plate.addEventListener('click', function () {
+      const img = plate.querySelector('img');
+      lbImg.src = img.src;
+      lbImg.alt = img.alt;
+      lb.classList.add('on');
+    });
+  });
+  function close() { lb.classList.remove('on'); lbImg.src = ''; }
+  lb.addEventListener('click', close);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') close();
+  });
+</script>

@@ -1,0 +1,8 @@
+{
+  "fan_margin": 0.1,
+  "plan_default": 0.1,
+  "tuned_on_seed": 1,
+  "reason": "most comfortable setting that still clears G4; equals the PLAN default",
+  "achievable_g3_pct": 25.412949944610496,
+  "model_g3_pct": 22.0960536548821
+}

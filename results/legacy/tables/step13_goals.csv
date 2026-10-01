@@ -1,0 +1,5 @@
+goal,what,target,achieved,limit,met
+G1,10-minute prediction MAE (°C),<= 0.25,0.23,0.184,True
+G2,correct decisions on 30 paired trials,>= 90% and improvement on the rule,96.7%; 99.5% vs rule 95.5% at n=400,100%,True
+G3,"degree-minutes above 26 °C, vs timer",>= 30% reduction,22.9% reduction,26.3% reduction (reference controller),False
+G4,"fan runtime, vs timer",>= 30% reduction,48.8% reduction (48.8% in Wh),100% reduction,True

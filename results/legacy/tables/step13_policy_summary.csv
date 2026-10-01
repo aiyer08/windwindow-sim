@@ -1,0 +1,4 @@
+policy,degree_minutes_over_26,minutes_over_26,minutes_under_24,mean_t_in,max_t_in,fan_minutes,fan_wh,window_open_minutes,window_moves
+timer,484.78,111.46,55.88,27.12,35.37,89.5,3.73,89.5,12.0
+simple_rule,359.49,92.12,54.29,26.95,33.77,111.92,4.66,111.92,5.5
+model,373.63,97.33,54.25,27.07,33.3,45.79,1.91,119.33,3.33
